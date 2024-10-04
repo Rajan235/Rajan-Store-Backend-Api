@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  username    String    @unique
+  email       String    @unique
+  fullName    String
+  role        UserRole @default(CUSTOMER)
+  password    String
+  refreshToken String?
+  cart        Cart?     
+  cartId      Int?      @unique
+  orders      Order[]   // A user can have multiple orders
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String
+  price       Decimal    @db.Decimal(10, 2)
+  imageUrl    String
+  cartItems   CartItem[] // A product can appear in multiple cart items
+  orderItems  OrderItem[] // A product can appear in multiple order items
+}
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cartItems CartItem[] // A cart can have multiple items
+}
+
+model CartItem {
+  id        Int        @id @default(autoincrement())
+  quantity  Int        @default(1) @db.Integer
+  productId Int
+  cartId    Int
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cart      Cart       @relation(fields: [cartId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id        Int        @id @default(autoincrement())
+  total     Decimal    @db.Decimal(10, 2)
+  userId    Int
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     OrderItem[] // An order can have multiple items
+  createdAt DateTime    @default(now())
+}
+
+model OrderItem {
+  id        Int        @id @default(autoincrement())
+  quantity  Int        @default(1) @db.Integer
+  price     Decimal    @db.Decimal(10, 2)
+  productId Int
+  orderId   Int
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
