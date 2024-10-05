@@ -56,7 +56,7 @@ const generateRefreshToken = async (user) => {
 
 //registring user
 const registerUser = asyncHandler(async (req, res, next) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password } = req.body;
   try {
     // Basic validation
     if (!name || !email || !password) {
@@ -79,10 +79,12 @@ const registerUser = asyncHandler(async (req, res, next) => {
     //   userRole = User.Roles.ADMIN; // Set role to admin
     // }
     // Check if user already exists
-    const existingUser = User.findOne({ where: { email: email } });
+    const existingUser = await User.findOne({ where: { email: email } });
 
     if (existingUser) {
-      throw new ApiError(400, "User with this email already exists");
+      return res
+        .status(201)
+        .json(new ApiResponse(400, null, "User Already registered "));
     }
 
     const hashedPassword = await bcrypt.hash(password, 10); // Make sure to hash the password
@@ -115,17 +117,16 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid credentials");
   }
 
-  const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
+  const accessToken = await generateAccessToken(user);
+  const refreshToken = await generateRefreshToken(user);
 
-  await user.update({
-    where: { id: user.id },
-    data: { refreshToken },
-  });
+  // Save the refresh token to the user record
+  await user.update({ refreshToken });
 
-  const loggedInUser = await User.findUnique({
+  // Select the user fields you want to return
+  const loggedInUser = await User.findOne({
     where: { id: user.id },
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    attributes: ["id", "name", "email", "role", "createdAt"],
   });
   const options = {
     httpOnly: true,
@@ -164,15 +165,14 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
       incomingRefreshtoken,
       process.env.REFRESH_TOKEN_SECRET
     );
-    const user = await User.findUnique({
-      where: { id: decodedToken?.id },
-    });
+
+    const user = await User.findByPk(decodedToken?.id);
 
     if (!user) {
       throw new ApiError(401, "Invalid refresh token");
     }
 
-    if (incomingRefreshToken !== user?.refreshToken) {
+    if (incomingRefreshtoken !== user?.refreshToken) {
       throw new ApiError(401, "Refresh token is expired or used");
     }
 
@@ -181,15 +181,17 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
       secure: true,
     };
 
-    const newAccessToken = generateAccessToken(user);
-    const newRefreshToken = generateRefreshToken(user);
-    await User.update({
-      where: { id: user.id },
-      data: { refreshToken: newRefreshToken },
-    });
+    const newAccessToken = await generateAccessToken(user);
+    const newRefreshToken = await generateRefreshToken(user);
+
+    // Corrected update syntax
+    await User.update(
+      { refreshToken: newRefreshToken },
+      { where: { id: user.id } }
+    );
+
     return res
       .status(200)
-
       .cookie("accessToken", newAccessToken, options)
       .cookie("refreshToken", newRefreshToken, options)
       .json(
@@ -209,12 +211,11 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
 const logoutUser = asyncHandler(async (req, res, next) => {
   const userId = req.user.id;
 
-  await User.update({
-    where: {
-      id: userId,
-    },
-    data: { refreshToken: null },
-  });
+  await User.update(
+    { refreshToken: null }, // Update the refreshToken to null
+    { where: { id: userId } } // Specify the user to update
+  );
+
   const options = {
     httpOnly: true,
     secure: true,
@@ -235,7 +236,7 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
     throw new ApiError(400, "Email is required");
   }
 
-  const user = User.findOne({ where: { email: email } });
+  const user = await User.findOne({ where: { email: email } });
 
   if (!user) {
     throw new ApiError(404, "User not found");
@@ -249,18 +250,20 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
 
   // send email with reset link and token
   const resetLink = `${process.env.FRONTEND_URL}/reset-password/${passwordResetToken}`;
-  await transporter.sendMail({
-    from: '"Your App Name" <noreply@yourapp.com>', // Adjust the 'from' address
-    to: user.email, // Recipient
-    subject: "Password Reset Request",
-    text: `You requested a password reset. Click the link to reset your password: ${resetLink}`,
-    html: `<p>You requested a password reset. Click the link below to reset your password:</p>
-           <a href="${resetLink}">${resetLink}</a>`, // HTML version
-  });
+  // await transporter.sendMail({
+  //   from: '"Your App Name" <noreply@yourapp.com>', // Adjust the 'from' address
+  //   to: user.email, // Recipient
+  //   subject: "Password Reset Request",
+  //   text: `You requested a password reset. Click the link to reset your password: ${resetLink}`,
+  //   html: `<p>You requested a password reset. Click the link below to reset your password:</p>
+  //          <a href="${resetLink}">${resetLink}</a>`, // HTML version
+  // });
 
   res
     .status(200)
-    .json(new ApiResponse(200, null, "Password reset link sent to your email"));
+    .json(
+      new ApiResponse(200, resetLink, "Password reset link sent to your email")
+    );
 });
 
 // reset functanality
@@ -273,9 +276,16 @@ const resetPassword = asyncHandler(async (req, res, next) => {
     throw new ApiError(400, "Token and new password are required");
   }
 
-  const decodedToken = jwt.verify(token, process.env.RESET_PASSWORD_SECRET);
+  // Verify token
+  let decodedToken;
+  try {
+    decodedToken = jwt.verify(token, process.env.RESET_PASSWORD_SECRET);
+  } catch (error) {
+    throw new ApiError(401, "Invalid token");
+  }
 
-  const user = User.findByPk({ where: { id: decodedToken.id } });
+  // Fetch user from database
+  const user = await User.findByPk(decodedToken.id);
 
   if (!user) {
     throw new ApiError(404, "User not found");

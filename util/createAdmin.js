@@ -1,12 +1,13 @@
-import User from "../models/user.model";
-import bcrypt from "bcrypt";
+import User from "../models/user.model.js";
+import bcrypt from "bcryptjs";
 
 const createAdminUser = async () => {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminName = process.env.ADMIN_NAME;
 
-    const existingAdmin = await User.findOne({ where: { isAdmin: true } });
+    const existingAdmin = await User.findOne({ where: { role: "admin" } });
 
     if (!existingAdmin) {
       const hashedPassword = await bcrypt.hash(adminPassword, 10); // Securely hash the admin password
@@ -14,6 +15,7 @@ const createAdminUser = async () => {
         email: adminEmail,
         password: hashedPassword,
         role: "admin",
+        name: adminName,
       });
       console.log("Admin user created");
     } else {

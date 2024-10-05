@@ -1,4 +1,4 @@
-import { ApiError } from "../util/ApiError";
+import { ApiError } from "../util/ApiError.js";
 
 const checkAdmin = (req, res, next) => {
   if (req.user.role !== "admin") {

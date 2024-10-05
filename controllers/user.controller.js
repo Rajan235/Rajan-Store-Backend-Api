@@ -15,16 +15,26 @@ const getUserProfile = asyncHandler(async (req, res, next) => {
 // update user profile
 
 const updateUserProfile = asyncHandler(async (req, res, next) => {
-  const { fullName, email } = req.body;
-  if (!fullName || !email) {
+  const { name, email } = req.body;
+
+  // Check for required fields
+  if (!name || !email) {
     throw new ApiError(400, "All fields are required");
   }
-  // in this user remove password field for better secuirity
-  const user = await User.findByPk({ where: { id: req.user.id } });
 
-  user.update({ data: { name: fullName, email: email } });
+  // Find user by primary key (assuming req.user.id is set correctly)
+  const user = await User.findByPk(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Update user fields
+  await user.update({ name, email }); // Directly pass the fields to update
+
+  // Remove sensitive data from response
   const { password, refreshToken, ...userData } = user.dataValues;
 
+  // Send response
   return res
     .status(200)
     .json(

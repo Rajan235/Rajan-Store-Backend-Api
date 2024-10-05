@@ -13,8 +13,8 @@ dotenv.config({
 sequelize
   .sync()
   .then(async () => {
-    await createAdminUser;
-    const PORT = process.env.PORT || 8000;
+    await createAdminUser();
+    const PORT = process.env.PORT || 5001;
     app.listen(PORT, () => {
       console.log(`⚙️ Server is running at port: ${PORT}`);
     });
