@@ -23,15 +23,19 @@ const getCart = asyncHandler(async (req, res, next) => {
 const addToCart = asyncHandler(async (req, res, next) => {
   const { productId, quantity } = req.body;
   const user = req.user;
+  console.log(user);
   const product = await Product.findByPk(productId);
+  console.log(product);
   if (!product) {
     throw new ApiError(404, "Product not found");
   }
 
   let cart = await user.getCart();
+  console.log(cart);
   if (!cart) {
     cart = await user.createCart();
   }
+  console.log(cart);
   let cartItem = await CartItem.findOne({
     where: { cartId: cart.id, productId },
   });
@@ -79,11 +83,11 @@ const updateCartItem = asyncHandler(async (req, res, next) => {
 
 // remove item from cart
 const removeCartItem = asyncHandler(async (req, res, next) => {
-  const { cartItemId } = req.params; // cartItemId is passed in the route parameters
+  const { itemId } = req.params; // cartItemId is passed in the route parameters
   const user = req.user; // Assuming req.user contains the authenticated user's instance
 
   // Find the cart item by the given cartItemId
-  const cartItem = await CartItem.findByPk(cartItemId);
+  const cartItem = await CartItem.findByPk(itemId);
 
   // Check if the cart item exists
   if (!cartItem) {

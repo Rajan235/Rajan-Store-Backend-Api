@@ -6,7 +6,14 @@ import { asyncHandler } from "../util/asyncHandler.js";
 import { ApiError } from "../util/ApiError.js";
 
 import PDFDocument from "pdfkit";
+import CartItem from "../models/cart-item.model.js";
+import User from "../models/user.model.js";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import fs from "fs";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 //getting all user orders orders
 
 const getUserOrders = asyncHandler(async (req, res, next) => {
@@ -65,14 +72,20 @@ const getOrder = asyncHandler(async (req, res, next) => {
 const createOrder = asyncHandler(async (req, res, next) => {
   const user = req.user;
   const fetchedCart = await user.getCart();
+
   if (!fetchedCart) {
     throw new ApiError(404, "Cart not found");
   }
 
-  const cartItems = await fetchedCart.getItems();
+  const cartItems = await CartItem.findAll({
+    where: { cartId: fetchedCart.id },
+    include: { model: Product },
+  });
+
   if (!cartItems || cartItems.length === 0) {
     throw new ApiError(400, "No items in the cart");
   }
+
   let orderTotal = cartItems.reduce((sum, item) => {
     if (!item.Product || item.Product.price == null) {
       throw new ApiError(`Product not found for CartItem with ID ${item.id}`);
@@ -80,18 +93,19 @@ const createOrder = asyncHandler(async (req, res, next) => {
     return sum + item.quantity * item.Product.price;
   }, 0);
 
-  // order item update from cart item
   const newOrder = await Order.create({ userId: user.id, total: orderTotal });
+
   const orderItems = cartItems.map((item) => ({
     orderId: newOrder.id,
-    productId: item.Product.id,
+    productId: item.productId,
     quantity: item.quantity,
     price: item.Product.price,
   }));
+
   await OrderItem.bulkCreate(orderItems);
 
   // then destroy cart
-  await fetchedCart.setItems([]);
+  await CartItem.destroy({ where: { cartId: fetchedCart.id } });
 
   return res
     .status(201)
@@ -119,48 +133,93 @@ const cancelOrder = asyncHandler(async (req, res, next) => {
 });
 
 const getInvoice = asyncHandler(async (req, res, next) => {
-  const { orderId } = req.params; // Get orderId from the request parameters
+  const { orderId } = req.params;
 
   // Fetch the order details from the database
   const order = await Order.findOne({
     where: { id: orderId },
-    include: [{ model: User, attributes: ["name", "email"] }, "Products"], // Adjust based on your models
+    include: [{ model: User, attributes: ["name", "email"] }, "Products"],
   });
+
+  console.log(order);
 
   if (!order) {
     throw new ApiError(404, "Order not found");
   }
 
-  const invoiceName = "invoice-" + orderId + ".pdf";
-  const invoicePath = path.join("data", "invoices", invoiceName);
+  const invoiceName = `invoice-${orderId}.pdf`;
+  const invoicePath = join(
+    __dirname,
+    "..",
+    "public",
+    "data",
+    "invoices",
+    invoiceName
+  );
 
-  const pdfDoc = new PDFDocument();
+  if (!fs.existsSync(join(__dirname, "..", "public", "data", "invoices"))) {
+    fs.mkdirSync(join(__dirname, "..", "public", "data", "invoices"), {
+      recursive: true,
+    });
+  }
 
-  // Set the headers for PDF download
+  const pdfDoc = new PDFDocument({ margin: 50 });
+
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${invoiceName}"`); // Force download
+  res.setHeader("Content-Disposition", `attachment; filename="${invoiceName}"`);
 
-  // Pipe the PDF to the response
-  pdfDoc.pipe(fs.createWriteStream(invoicePath)); // Optional: save to the file system
-  pdfDoc.pipe(res); // Pipe PDF directly to the response
+  const fileStream = fs.createWriteStream(invoicePath);
+  pdfDoc.pipe(fileStream);
+  pdfDoc.pipe(res);
 
-  // PDF content generation
-  pdfDoc.fontSize(26).text("Invoice", { underline: true });
-  pdfDoc.text("----------------------------------------------------");
-  pdfDoc.fontSize(14).text(`Order ID: ${orderId}`);
-  pdfDoc.text(`Date: ${new Date().toLocaleDateString()}`);
-  pdfDoc.text(`Customer: ${order.User.name} (${order.User.email})`);
-  pdfDoc.text("----------------------------------------------------");
+  // Add Invoice Header
+  pdfDoc
+    .fontSize(26)
+    .text("INVOICE", { align: "center", underline: true })
+    .moveDown();
+
+  // Add Company Info
+  pdfDoc
+    .fontSize(14)
+    .text("Your Company Name", { align: "left" })
+    .text("Your Company Address", { align: "left" })
+    .text("Phone: +1234567890", { align: "left" })
+    .text("Email: company@email.com", { align: "left" })
+    .moveDown(2);
+
+  // Add Invoice Info
+  pdfDoc
+    .fontSize(18)
+    .text(`Order ID: ${orderId}`, { align: "left" })
+    .text(`Date: ${new Date().toLocaleDateString()}`, { align: "left" })
+    .text(`Customer: ${order.User.name} (${order.User.email})`, {
+      align: "left",
+    })
+    .moveDown();
+
+  pdfDoc
+    .text("----------------------------------------------------")
+    .moveDown(1);
 
   let totalPrice = 0;
 
+  // Iterate over products and ensure price is treated as a number
   order.Products.forEach((prod) => {
-    const itemTotal = prod.OrderItem.quantity * prod.price;
+    const quantity = prod.OrderItem?.quantity || 0; // Ensure quantity is available
+    const price = parseFloat(prod.price); // Convert price to float
+
+    if (isNaN(price)) {
+      console.error(`Invalid price for product ${prod.title}: ${prod.price}`);
+      return; // Skip this product if price is invalid
+    }
+
+    const itemTotal = quantity * price;
     totalPrice += itemTotal;
+
     pdfDoc
       .fontSize(14)
       .text(
-        `${prod.title} - ${prod.OrderItem.quantity} x $${prod.price.toFixed(2)} = $${itemTotal.toFixed(2)}`
+        `${prod.title} - ${quantity} x $${price.toFixed(2)} = $${itemTotal.toFixed(2)}`
       );
   });
 
@@ -169,17 +228,14 @@ const getInvoice = asyncHandler(async (req, res, next) => {
   pdfDoc.text("----------------------------------------------------");
   pdfDoc.fontSize(14).text("Thank you for your purchase!");
 
-  // Finalize the PDF and end the stream
   pdfDoc.end();
 
-  // Handle errors in PDF stream
   pdfDoc.on("error", (err) => {
     return next(new ApiError(500, "Error generating invoice: " + err.message));
   });
 
-  // Optionally, you can handle the finish event
-  pdfDoc.on("finish", () => {
-    console.log(`Invoice ${invoiceName} generated successfully.`);
+  fileStream.on("finish", () => {
+    console.log(`Invoice ${invoiceName} generated and saved to server.`);
   });
 });
 

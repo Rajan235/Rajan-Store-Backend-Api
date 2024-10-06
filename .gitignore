@@ -3,6 +3,7 @@ node_modules
 images
 data
 .vscode
+public
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 

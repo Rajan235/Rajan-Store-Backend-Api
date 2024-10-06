@@ -2,6 +2,7 @@ import { createCheckoutSession, getCheckoutSession } from "../util/stripe.js"; /
 import { ApiResponse } from "../util/ApiResponse.js";
 import { asyncHandler } from "../util/asyncHandler.js";
 import { ApiError } from "../util/ApiError.js";
+import Order from "../models/order.model.js";
 
 const initiateCheckout = asyncHandler(async (req, res, next) => {
   const user = req.user;

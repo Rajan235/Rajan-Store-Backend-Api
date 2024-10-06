@@ -10,10 +10,10 @@ import {
 
 const router = Router();
 
-router.route("/cart").get(verifyJWT, getCart);
-router.route("/cart/items").post(verifyJWT, addToCart);
-router.route("/cart/items/:itemId").put(verifyJWT, updateCartItem);
-router.route("/cart/items/:itemId").delete(verifyJWT, removeCartItem);
-router.route("/cart").delete(verifyJWT, clearCart);
+router.route("/").get(verifyJWT, getCart);
+router.route("/items").post(verifyJWT, addToCart);
+router.route("/items/:itemId").put(verifyJWT, updateCartItem);
+router.route("/items/:itemId").delete(verifyJWT, removeCartItem);
+router.route("/").delete(verifyJWT, clearCart);
 
 export default router;
