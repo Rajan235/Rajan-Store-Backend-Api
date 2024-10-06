@@ -261,9 +261,7 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
 
   res
     .status(200)
-    .json(
-      new ApiResponse(200, resetLink, "Password reset link sent to your email")
-    );
+    .json(new ApiResponse(200, null, "Password reset link sent to your email"));
 });
 
 // reset functanality

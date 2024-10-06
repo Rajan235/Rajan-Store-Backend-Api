@@ -50,7 +50,7 @@ app.use("/api/v1/products", productRouter); // Public product-related routes
 app.use("/api/v1/cart", cartRouter); // Cart routes for logged-in users
 app.use("/api/v1/orders", orderRouter); // Order-related routes
 app.use("/api/v1/users", userRouter); // User-related actions (profile, etc.)
-app.use("/api/v1/admin/users", userAdminRouter); // Admin-specific user management
+app.use("/api/v1/admin", userAdminRouter);
 app.use("/api/v1/checkout", checkoutAndPaymentRouter); // Checkout and payment routes
 
 // // Error handling routes

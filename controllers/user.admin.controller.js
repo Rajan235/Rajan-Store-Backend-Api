@@ -2,6 +2,8 @@ import User from "../models/user.model.js";
 import { asyncHandler } from "../util/asyncHandler.js";
 import { ApiResponse } from "../util/ApiResponse.js";
 import { ApiError } from "../util/ApiError.js";
+import Product from "../models/product.model.js";
+import Order from "../models/order.model.js";
 
 const getAllUsers = asyncHandler(async (req, res, next) => {
   const users = await User.findAll(); // Fetch all users
@@ -42,17 +44,19 @@ const deleteUser = asyncHandler(async (req, res, next) => {
 
 // Create a new product
 const createProduct = asyncHandler(async (req, res, next) => {
-  const { name, price, description, imageUrl } = req.body; // Adjust as per your product model
+  const { title, price, description, imageUrl } = req.body; // Adjust as per your product model
+  const userId = req.user.id;
 
-  if (!name || !price || !description || !imageUrl) {
+  if (!title || !price || !description || !imageUrl) {
     throw new ApiError(400, "All fields are required");
   }
 
   const newProduct = await Product.create({
-    name,
+    title,
     price,
     description,
     imageUrl,
+    userId,
   });
 
   return res
@@ -62,16 +66,16 @@ const createProduct = asyncHandler(async (req, res, next) => {
 
 // Update a product by ID
 const updateProduct = asyncHandler(async (req, res, next) => {
-  const productId = req.params.id; // Get product ID from request parameters
+  const productId = req.params.productId; // Get product ID from request parameters
   const product = await Product.findByPk(productId);
 
   if (!product) {
     throw new ApiError(404, "Product not found");
   }
 
-  const { name, price, description, imageUrl } = req.body; // Update fields
+  const { title, price, description, imageUrl } = req.body; // Update fields
 
-  await product.update({ name, price, description, imageUrl });
+  await product.update({ title, price, description, imageUrl });
   return res
     .status(200)
     .json(new ApiResponse(200, product, "Product updated successfully"));
@@ -79,7 +83,7 @@ const updateProduct = asyncHandler(async (req, res, next) => {
 
 // Delete a product by ID
 const deleteProduct = asyncHandler(async (req, res, next) => {
-  const productId = req.params.id; // Get product ID from request parameters
+  const productId = req.params.productId; // Get product ID from request parameters
   const product = await Product.findByPk(productId);
 
   if (!product) {

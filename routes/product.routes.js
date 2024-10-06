@@ -5,7 +5,7 @@ import { getProducts, getProduct } from "../controllers/product.controller.js"; 
 const router = Router();
 
 // Public routes -
-router.route("/products").get(getProducts);
-router.route("/products/:productId").get(getProduct);
+router.route("/").get(getProducts);
+router.route("/:productId").get(getProduct);
 
 export default router;
