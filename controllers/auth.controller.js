@@ -108,6 +108,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
 // logging in the user with response as user
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+
   if (!email) {
     throw new ApiError(400, "email is required");
   }
@@ -130,7 +131,7 @@ const loginUser = asyncHandler(async (req, res) => {
   });
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
   };
 
   return res

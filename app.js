@@ -28,12 +28,19 @@ import checkoutAndPaymentRouter from "./routes/checkoutAndPayment.routes.js";
 const app = express();
 
 // Middleware setup
+// {
+//   origin: process.env.CORS_ORIGIN,
+//   credentials: true,
+// }
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN,
-    credentials: true,
+    origin: "http://localhost:3000", // Explicitly allow the frontend URL
+    methods: "GET,POST,PUT,DELETE",
+    credentials: true, // This allows cookies and credentials to be sent
+    allowedHeaders: "Content-Type, Authorization", // Specify allowed headers
   })
 );
+
 // middlewares
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
